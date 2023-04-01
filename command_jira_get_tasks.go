@@ -5,7 +5,6 @@ import (
     "encoding/base64"
     "encoding/json"
     "fmt"
-    "github.com/davecgh/go-spew/spew"
     log "github.com/sirupsen/logrus"
     "io"
     "net/http"
@@ -17,6 +16,7 @@ type CommandJiraGetTasks struct {
     host  string
     user  string
     token string
+    args  []string
 }
 
 func NewCommandJiraGetTasks() *CommandJiraGetTasks {
@@ -31,39 +31,39 @@ func (c *CommandJiraGetTasks) Name() string {
     return "jiraSearchTasks"
 }
 
-func (c *CommandJiraGetTasks) Prompts() []PromptExample {
-    return []PromptExample{
+func (c *CommandJiraGetTasks) Prompts() []Prompt {
+    return []Prompt{
         {
             "покажи мои открытые задачи",
-            CommandSpec{
+            ExecSpec{
                 "jiraSearchTasks",
                 []string{"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"},
             },
         },
         {
             "покажи мои задачи",
-            CommandSpec{
+            ExecSpec{
                 "jiraSearchTasks",
                 []string{"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"},
             },
         },
         {
             "покажи все задачи, которые я создал",
-            CommandSpec{
+            ExecSpec{
                 "jiraSearchTasks",
                 []string{"reporter = currentUser()"},
             },
         },
         {
             "покажи все недавно созданные задачи",
-            CommandSpec{
+            ExecSpec{
                 "jiraSearchTasks",
                 []string{"created >= -1w order by created DESC"},
             },
         },
         {
             "покажи мои эпики",
-            CommandSpec{
+            ExecSpec{
                 "jiraSearchTasks",
                 []string{"issuetype = Epic AND resolution = Unresolved AND (watcher = currentUser() OR assignee = currentUser()) order by created DESC"},
             },
@@ -71,11 +71,15 @@ func (c *CommandJiraGetTasks) Prompts() []PromptExample {
     }
 }
 
-func (c *CommandJiraGetTasks) Execute(args []string) (string, error) {
-    if len(args) < 1 {
+func (c *CommandJiraGetTasks) SetArguments(args []string) {
+    c.args = args
+}
+
+func (c *CommandJiraGetTasks) Execute() (string, error) {
+    if len(c.args) < 1 {
         return "", fmt.Errorf("jiraSearchTasks command requires at least 1 argument")
     }
-    jiraTasks, err := c.makeJiraSearch(args[0])
+    jiraTasks, err := c.makeJiraSearch(c.args[0])
     if err != nil {
         return "", fmt.Errorf("failed to make jira search: %w", err)
     }
@@ -121,7 +125,6 @@ func (c *CommandJiraGetTasks) makeJiraSearch(jql string) (*jiraSearchResponseSpe
 }
 
 func formatTasks(js *jiraSearchResponseSpec) (string, error) {
-    spew.Dump(js)
     t, err := template.New("person").Parse(`
 {{range .Issues}}
     - {{.Key}} {{.Fields.Issuetype.Name}} {{.Fields.Summary}}({{.Fields.Creator.DisplayName}} -> {{.Fields.Assignee.DisplayName}}]): {{.Fields.Status.Name}} 
