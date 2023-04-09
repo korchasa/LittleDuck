@@ -31,55 +31,8 @@ func (c *CommandJiraGetTasks) Name() string {
     return "jiraSearchTasks"
 }
 
-func (c *CommandJiraGetTasks) Prompts() []Prompt {
-    return []Prompt{
-        {
-            "покажи мои открытые задачи",
-            ExecSpec{
-                "jiraSearchTasks",
-                []string{"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"},
-            },
-        },
-        {
-            "покажи мои задачи",
-            ExecSpec{
-                "jiraSearchTasks",
-                []string{"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"},
-            },
-        },
-        {
-            "покажи все задачи, которые я создал",
-            ExecSpec{
-                "jiraSearchTasks",
-                []string{"reporter = currentUser()"},
-            },
-        },
-        {
-            "покажи все недавно созданные задачи",
-            ExecSpec{
-                "jiraSearchTasks",
-                []string{"created >= -1w order by created DESC"},
-            },
-        },
-        {
-            "покажи мои эпики",
-            ExecSpec{
-                "jiraSearchTasks",
-                []string{"issuetype = Epic AND resolution = Unresolved AND (watcher = currentUser() OR assignee = currentUser()) order by created DESC"},
-            },
-        },
-    }
-}
-
-func (c *CommandJiraGetTasks) SetArguments(args []string) {
-    c.args = args
-}
-
-func (c *CommandJiraGetTasks) Execute() (string, error) {
-    if len(c.args) < 1 {
-        return "", fmt.Errorf("jiraSearchTasks command requires at least 1 argument")
-    }
-    jiraTasks, err := c.makeJiraSearch(c.args[0])
+func (c *CommandJiraGetTasks) Execute(query string) (string, error) {
+    jiraTasks, err := c.makeJiraSearch(query)
     if err != nil {
         return "", fmt.Errorf("failed to make jira search: %w", err)
     }
@@ -127,7 +80,7 @@ func (c *CommandJiraGetTasks) makeJiraSearch(jql string) (*jiraSearchResponseSpe
 func formatTasks(js *jiraSearchResponseSpec) (string, error) {
     t, err := template.New("person").Parse(`
 {{range .Issues}}
-    - {{.Key}} {{.Fields.Issuetype.Name}} {{.Fields.Summary}}({{.Fields.Creator.DisplayName}} -> {{.Fields.Assignee.DisplayName}}]): {{.Fields.Status.Name}} 
+    - {{.Fields.Project.Key}}-{{.Key}} {{.Fields.Issuetype.Name}} {{.Fields.Summary}}({{.Fields.Creator.DisplayName}} -> {{.Fields.Assignee.DisplayName}}]): {{.Fields.Status.Name}} 
 {{- end}}
 `)
     if err != nil {

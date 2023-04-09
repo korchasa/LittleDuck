@@ -17,24 +17,7 @@ func (c *CommandClearScreen) Name() string {
     return "clearScreen"
 }
 
-func (c *CommandClearScreen) Prompts() []Prompt {
-    return []Prompt{
-        {
-            "clear",
-            ExecSpec{"clearScreen", []string{}},
-        },
-        {
-            "очисти экран",
-            ExecSpec{"clearScreen", []string{}},
-        },
-    }
-}
-
-func (c *CommandClearScreen) SetArguments(args []string) {
-    c.args = args
-}
-
-func (c *CommandClearScreen) Execute() (string, error) {
+func (c *CommandClearScreen) Execute(_ string) (string, error) {
     cmd := exec.Command("clear")
     cmd.Stdout = os.Stdout
     return "", cmd.Run()

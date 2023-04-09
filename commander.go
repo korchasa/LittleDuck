@@ -1,103 +1,69 @@
 package main
 
 import (
-    "bytes"
     "encoding/json"
     "fmt"
-    "github.com/sashabaranov/go-openai"
-    "text/template"
+    "korchasa/little-duck/pkg/chat_gpt"
 )
 
-type Prompt struct {
-    Input  string
-    Output ExecSpec
-}
+const (
+    CommandSelectorModelPath = "./models/command-selector.yaml"
+)
 
 type ExecSpec struct {
-    Name      string   `json:"command"`
-    Arguments []string `json:"arguments"`
+    Name  string `json:"command"`
+    Query string `json:"query"`
 }
 
 type Command interface {
     Name() string
-    SetArguments(args []string)
-    Prompts() []Prompt
-    Execute() (string, error)
+    Execute(query string) (string, error)
 }
 
-type Commander struct {
+type CommandSelector struct {
     commands []Command
-    template *template.Template
+    model    *chat_gpt.Model
 }
 
-func NewCommander(commands []Command) (*Commander, error) {
-    tpl, err := template.New("commander").Parse(`Turn a user message into a command description, in json format:
-{"command": "<command name>", "arguments": ["<argument 1>", "<argument 2>", ...]}
-
-The arguments must be strings. The command name can be one of:
-{{ range . }}
- - {{ .Name }}
-{{- end }}
-
-Examples:
-{{ range . }}
-    {{ range .Prompts }}
-Example: {{ .Input }}
-Output: {"command": "{{ .Output.Name }}", "arguments": [{{ range $index, $element := .Output.Arguments }}{{if $index}}, {{end}}"{{ . }}"{{ end }}]}
-    {{ end }}
-{{- end }}
-
-If you can't determine the type of command, answer with an empty string.
-`)
+func NewCommandSelector(commands []Command) (*CommandSelector, error) {
+    m, err := chat_gpt.LoadModel(CommandSelectorModelPath)
     if err != nil {
-        return nil, fmt.Errorf("failed to parse commander template: %w", err)
+        return nil, fmt.Errorf("failed to load model `%s`: %w", CommandSelectorModelPath, err)
     }
-    return &Commander{
+    return &CommandSelector{
         commands: commands,
-        template: tpl,
+        model:    m,
     }, nil
 }
 
-func (c *Commander) ExtractCommand(text string) (Command, error) {
-    var prompt bytes.Buffer
-    err := c.template.Execute(&prompt, c.commands)
+func (c *CommandSelector) ExtractCommand(text string) (comm Command, query string, err error) {
+    resp, err := c.model.AskChatGPTAndGetResponse(text)
     if err != nil {
-        return nil, fmt.Errorf("failed to execute template: %w", err)
-    }
-
-    resp, err := gpt.AskChatGPTAndGetResponse([]openai.ChatCompletionMessage{
-        {
-            Role:    openai.ChatMessageRoleSystem,
-            Content: prompt.String(),
-        },
-        {
-            Role:    openai.ChatMessageRoleUser,
-            Content: fmt.Sprintf("Example: %s\nOutput: ", text),
-        },
-    })
-    if err != nil {
-        return nil, fmt.Errorf("failed to ask chat gpt: %w", err)
+        return nil, "", fmt.Errorf("failed to ask chat gpt: %w", err)
     }
 
     spec := &ExecSpec{}
     err = json.Unmarshal([]byte(resp), spec)
     if err != nil {
-        return nil, fmt.Errorf("failed to unmarshal command spec: %w", err)
+        return nil, "", fmt.Errorf("failed to unmarshal command spec: %w", err)
     }
 
-    command := c.findCommand(spec.Name)
-    if command == nil {
-        return nil, nil
-    }
-    command.SetArguments(spec.Arguments)
-    return command, nil
+    return c.findCommand(spec.Name), spec.Query, nil
 }
 
-func (c *Commander) findCommand(name string) Command {
+func (c *CommandSelector) findCommand(name string) Command {
     for _, cmd := range c.commands {
         if cmd.Name() == name {
             return cmd
         }
     }
     return nil
+}
+
+func (c *CommandSelector) ExecuteSpec(spec ExecSpec) (string, error) {
+    command := c.findCommand(spec.Name)
+    if command == nil {
+        return "", fmt.Errorf("command %s not found", spec.Name)
+    }
+    return command.Execute(spec.Query)
 }

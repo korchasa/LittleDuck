@@ -1,0 +1,54 @@
+model: gpt-3.5-turbo
+max_tokens: 1000
+messages:
+  - role: system
+    content: |
+      Turn a user message into a command description, in json format:
+      {"command": "<command name>", "query": "<query>"}
+
+      The arguments must be strings. The command name can be one of:        
+        - clearScreen
+        - jiraSearchTasks
+        - jiraCreateTask
+        - remindMe
+      
+      If you can't determine the type of command, answer with "{}".
+  - role: user
+    content: clear
+  - role: assistant
+    content: "{'command': 'clearScreen', 'query': []}"
+
+  - role: user
+    content: очисти экран
+  - role: assistant
+    content: "{'command': 'clearScreen', 'query': []}"
+
+  - role: user
+    content: покажи мои открытые задачи
+  - role: assistant
+    content: "{'command': 'jiraSearchTasks', 'query': 'покажи мои открытые задачи'}"
+
+  - role: user
+    content: покажи мои задачи
+  - role: assistant
+    content: "{'command': 'jiraSearchTasks', 'query': 'покажи мои задачи'}"
+
+  - role: user
+    content: покажи все задачи, которые я создал
+  - role: assistant
+    content: "{'command': 'jiraSearchTasks', 'query': 'покажи все задачи, которые я создал'}"
+
+  - role: user
+    content: покажи все недавно созданные задачи
+  - role: assistant
+    content: "{'command': 'jiraSearchTasks', 'query': 'покажи все недавно созданные задачи'}"
+
+  - role: user
+    content: покажи мои эпики
+  - role: assistant
+    content: "{'command': 'jiraSearchTasks', 'query': 'покажи мои эпики'}"
+
+  - role: user
+    content: напомни написать @user1, по поводу DEVOPS-123
+  - role: assistant
+    content: "{'command': 'remindMe', 'query': 'напомни написать @user1, по поводу DEVOPS-123'}"
